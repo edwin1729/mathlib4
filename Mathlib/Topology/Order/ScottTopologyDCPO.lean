@@ -162,9 +162,21 @@ lemma isOpen_of_basis {u : Set α} (hu : u ∈ Ici '' CompactSet α) : IsOpen u 
     · exact a_in_d
     · exact a_in_u
 
+structure CompactElement (α : Type*) [PartialOrder α] where
+  val : α
+  compact : IsCompactElement val
+
+-- instance : Membership (CompactElement α) (Set α) where
+--   mem s c := c.val ∈ s
+
+instance : Coe (CompactElement α) α where
+  coe c := c.val
+open Filter
+#check Membership
+
 /-- The upwards closure of a compact point which we know is open -/
-def IsCompactElement.toOpen {c : α} (hc : IsCompactElement c) : Opens α :=
-  ⟨Ici c, isOpen_of_basis <| Set.mem_image_of_mem Ici hc⟩
+def CompactElement.toOpen (c : CompactElement α) : Opens α :=
+  ⟨Ici c, isOpen_of_basis <| Set.mem_image_of_mem Ici c.compact⟩
 
 /-- A helper. This can be made more straightforward by replacing `{u : Opens α}` with
 `{u : UpperSet}` and applying the additional lemma `Topology.IsScott.isUpperSet_of_isOpen`
@@ -247,7 +259,7 @@ lemma open_eq_open_of_basis (u : Set D) (hu : IsOpen u) :
 lemma open_eq_open_of_basis' (u : Opens D) :
     -- u = sSup ({ o | ∃ (c : D) (hc : IsCompactElement c), c ∈ u ∧ o = hc.toOpen }) := by
     -- u = iSup (fun (c : {c : D // Compact c ∧ c ∈ u}) ↦  ⟨c.1, c.2.1⟩ᵘᵒ ) := by
-    u = ⨆ c : {c | IsCompactElement c ∧ c ∈ u}, IsCompactElement.toOpen c.2.1 := by
+    u = ⨆ c : {c : Compact | IsCompactElement c ∧ c ∈ u}, IsCompactElement.toOpen c.2.1 := by
     -- u = ⨆ (c : D) (hc : IsCompactElement c) (_ : c ∈ u), hc.toOpen := by
   ext e
   simp only [SetLike.mem_coe]
@@ -390,6 +402,7 @@ lemma surjectivity : Function.Surjective (localePointOfSpacePoint D) := by
             intro ⟨e, he₀, he'₀, he'₁⟩
             use e; use e; use he₀;
         _ ↔ x u := by
+
           constructor
           · let P (o: Opens D) := ∃ (c: D) (hc: IsCompactElement c), c ∈ u ∧ (o = hc.toOpen)
             -- intro he
@@ -399,6 +412,7 @@ lemma surjectivity : Function.Surjective (localePointOfSpacePoint D) := by
               exact ⟨⟨e, he₀, Opens.mem_iff_Ici_subset.2 he'₀, rfl⟩, he'₁⟩
 
             rw [← of_completelyPrime] at he'
+
             rw [← open_eq_open_of_basis' u] at he'
             exact he'
           · intro hu
