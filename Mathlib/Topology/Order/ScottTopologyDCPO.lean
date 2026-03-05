@@ -162,21 +162,29 @@ lemma isOpen_of_basis {u : Set α} (hu : u ∈ Ici '' CompactSet α) : IsOpen u 
     · exact a_in_d
     · exact a_in_u
 
-structure CompactElement (α : Type*) [PartialOrder α] where
-  val : α
-  compact : IsCompactElement val
+abbrev CompactElement (α : Type*) [PartialOrder α] := {x : α // IsCompactElement x}
+-- structure CompactElement (α : Type*) [PartialOrder α] where
+--   val : α
+--   compact : IsCompactElement val
+
+-- instance : Coe (CompactElement α) α where
+--   coe c := c.val
 
 -- instance : Membership (CompactElement α) (Set α) where
 --   mem s c := c.val ∈ s
 
-instance : Coe (CompactElement α) α where
-  coe c := c.val
+-- #check Membership
+
 open Filter
-#check Membership
 
 /-- The upwards closure of a compact point which we know is open -/
-def CompactElement.toOpen (c : CompactElement α) : Opens α :=
-  ⟨Ici c, isOpen_of_basis <| Set.mem_image_of_mem Ici c.compact⟩
+abbrev Subtype.toOpen (c : CompactElement α) : Opens α :=
+  ⟨Ici c, isOpen_of_basis <| Set.mem_image_of_mem Ici c.prop⟩
+
+/-- The upwards closure of a compact point which we know is open.
+In this version the data is implicit -/
+abbrev IsCompactElement.toOpen {c : α} (hc : IsCompactElement c) : Opens α :=
+  (⟨c, hc⟩ : CompactElement α).toOpen
 
 /-- A helper. This can be made more straightforward by replacing `{u : Opens α}` with
 `{u : UpperSet}` and applying the additional lemma `Topology.IsScott.isUpperSet_of_isOpen`
@@ -259,7 +267,7 @@ lemma open_eq_open_of_basis (u : Set D) (hu : IsOpen u) :
 lemma open_eq_open_of_basis' (u : Opens D) :
     -- u = sSup ({ o | ∃ (c : D) (hc : IsCompactElement c), c ∈ u ∧ o = hc.toOpen }) := by
     -- u = iSup (fun (c : {c : D // Compact c ∧ c ∈ u}) ↦  ⟨c.1, c.2.1⟩ᵘᵒ ) := by
-    u = ⨆ c : {c : Compact | IsCompactElement c ∧ c ∈ u}, IsCompactElement.toOpen c.2.1 := by
+    u = ⨆ c : {c | IsCompactElement c ∧ c ∈ u}, IsCompactElement.toOpen c.2.1 := by
     -- u = ⨆ (c : D) (hc : IsCompactElement c) (_ : c ∈ u), hc.toOpen := by
   ext e
   simp only [SetLike.mem_coe]
@@ -275,6 +283,7 @@ lemma open_eq_open_of_basis' (u : Opens D) :
     obtain ⟨c, ⟨hc₀, c_in_u⟩, he⟩ := he
     rw [mem_iff_Ici_subset] at c_in_u
     apply Set.mem_of_mem_of_subset he c_in_u
+
 
 end AlgebraicDCPO
 
@@ -310,11 +319,7 @@ lemma of_completelyPrime {D : Type*} [TopologicalSpace D]
 variable {D : Type*} [tD : TopologicalSpace D] [aD : AlgebraicDCPO D]
   [sD : IsScott D {d | DirectedOn (· ≤ ·) d}]
 
-/-- We claim that x is entirely determined by its set of compact elements generating
-    the basic opens.
-    Proving this correspondence establishes the homeomorphism we want.
-    We define the set `K x` the upwards closure of whose elements are the basic opens. -/
-abbrev K (x : PT (Opens D)) := { c | ∃ hc: IsCompactElement c, x hc.toOpen }
+abbrev K (x : PT (Opens D)) := {c | ∃ hc: IsCompactElement c, x hc.toOpen}
 
 /-- The set of compact elements underlying the basic opens is directed -/
 lemma directed_Kₓ (x : PT (Opens D)) : DirectedOn (· ≤ ·) (K x) := by
@@ -324,12 +329,14 @@ lemma directed_Kₓ (x : PT (Opens D)) : DirectedOn (· ≤ ·) (K x) := by
   have inf_in_x : x inf := by
     simp only [map_inf, inf]
     exact ⟨hc₁, hd₁⟩
-  obtain ⟨e', ⟨e, he'₁⟩, he'₂⟩ := of_completelyPrime.1 ((open_eq_open_of_basis' inf) ▸ inf_in_x)
+  have basis := by
+    rw [open_eq_open_of_basis' inf] at inf_in_x
+    exact of_completelyPrime.1 inf_in_x
+  obtain ⟨e', ⟨e, he'₁⟩, he'₂⟩ := basis
   rw [← he'₁] at he'₂
   use e
   constructor
-  · simp only [Set.mem_setOf_eq]
-    exact ⟨e.2.1, he'₂⟩
+  · exact ⟨e.2.1, he'₂⟩
   · exact e.2.2
 
 /-- Large calc proof extracted here. Showing surjectivity of the homeomorphism. -/
@@ -405,18 +412,23 @@ lemma surjectivity : Function.Surjective (localePointOfSpacePoint D) := by
 
           constructor
           · let P (o: Opens D) := ∃ (c: D) (hc: IsCompactElement c), c ∈ u ∧ (o = hc.toOpen)
-            -- intro he
             rintro ⟨e, he₀, he'₀, he'₁⟩
             have he': ∃ u, P u ∧ x u := by
               use he₀.toOpen
               exact ⟨⟨e, he₀, Opens.mem_iff_Ici_subset.2 he'₀, rfl⟩, he'₁⟩
 
             rw [← of_completelyPrime] at he'
+            let foo := open_eq_open_of_basis' u
+            rw [← sSup_range] at foo
+            rw [range] at foo
 
-            rw [← open_eq_open_of_basis' u] at he'
+            -- simp at foo
+
+            rw [← foo] at he'
             exact he'
           · intro hu
             rw [open_eq_open_of_basis' u] at hu
+
             rw [of_completelyPrime] at hu
 
             obtain ⟨e', ⟨e, he₀, he'₀, he'₁⟩ , he'₂⟩ := hu
